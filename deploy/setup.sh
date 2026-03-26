@@ -68,6 +68,8 @@ echo "[...] Fixing permissions (requires Docker)..."
 docker compose -f "$REPO_DIR/docker-compose.yml" --env-file "$SCRIPT_DIR/.env" \
   run --rm --user root --entrypoint sh openclaw-cli -c \
   'find /home/node/.openclaw -xdev -exec chown node:node {} +' 2>/dev/null || true
+# Stop any containers started by the run command
+docker compose -f "$REPO_DIR/docker-compose.yml" --env-file "$SCRIPT_DIR/.env" down 2>/dev/null || true
 echo "[OK] Permissions fixed"
 
 echo ""
