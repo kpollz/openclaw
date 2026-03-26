@@ -44,8 +44,26 @@
             "maxTokens": 8192
           },
           {
+            "id": "gausso-flash-s",
+            "name": "GaussO Flash (S)",
+            "reasoning": false,
+            "input": ["text"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 32768,
+            "maxTokens": 8192
+          },
+          {
             "id": "gausso4",
             "name": "GaussO4",
+            "reasoning": true,
+            "input": ["text"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 32768,
+            "maxTokens": 8192
+          },
+          {
+            "id": "gausso4-thinking",
+            "name": "GaussO4 Thinking",
             "reasoning": true,
             "input": ["text"],
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
@@ -118,6 +136,19 @@
     "defaults": {
       "model": {
         "primary": "gauss/gauss-2.3"
+      },
+      "models": {
+        "gauss/gauss-2.3": { "alias": "Gauss 2.3" },
+        "gauss/gauss-2.3-think": { "alias": "Gauss 2.3 Think" },
+        "gauss/gausso-flash": { "alias": "GaussO Flash" },
+        "gauss/gausso-flash-s": { "alias": "GaussO Flash (S)" },
+        "gauss/gausso4": { "alias": "GaussO4" },
+        "gauss/gausso4-thinking": { "alias": "GaussO4 Thinking" },
+        "zai/glm-5": { "alias": "GLM-5" },
+        "zai/glm-4.7": { "alias": "GLM-4.7" },
+        "zai/glm-4.7-flash": { "alias": "GLM-4.7 Flash" },
+        "google/gemini-2.5-flash-preview": { "alias": "Gemini 2.5 Flash" },
+        "google/gemini-2.0-flash": { "alias": "Gemini 2.0 Flash" }
       }
     }
   },
@@ -126,12 +157,7 @@
     "bind": "lan",
     "controlUi": {
       "dangerouslyDisableDeviceAuth": true,
-      "allowedOrigins": [
-        "http://localhost:18789",
-        "http://127.0.0.1:18789",
-        "http://localhost:18889",
-        "http://127.0.0.1:18889"
-      ]
+      "allowedOrigins": ["*"]
     }
   }
 }

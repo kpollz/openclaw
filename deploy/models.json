@@ -36,8 +36,28 @@
           "api": "openai-completions"
         },
         {
+          "id": "gausso-flash-s",
+          "name": "GaussO Flash (S)",
+          "reasoning": false,
+          "input": ["text"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 32768,
+          "maxTokens": 8192,
+          "api": "openai-completions"
+        },
+        {
           "id": "gausso4",
           "name": "GaussO4",
+          "reasoning": true,
+          "input": ["text"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 32768,
+          "maxTokens": 8192,
+          "api": "openai-completions"
+        },
+        {
+          "id": "gausso4-thinking",
+          "name": "GaussO4 Thinking",
           "reasoning": true,
           "input": ["text"],
           "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
