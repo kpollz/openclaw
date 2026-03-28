@@ -142,15 +142,13 @@ RUN --mount=type=cache,id=openclaw-bookworm-apt-cache,target=/var/cache/apt,shar
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       procps hostname curl git lsof openssl
 
-RUN chown node:node /app
-
-COPY --from=runtime-assets --chown=node:node /app/dist ./dist
-COPY --from=runtime-assets --chown=node:node /app/node_modules ./node_modules
-COPY --from=runtime-assets --chown=node:node /app/package.json .
-COPY --from=runtime-assets --chown=node:node /app/openclaw.mjs .
-COPY --from=runtime-assets --chown=node:node /app/extensions ./extensions
-COPY --from=runtime-assets --chown=node:node /app/skills ./skills
-COPY --from=runtime-assets --chown=node:node /app/docs ./docs
+COPY --from=runtime-assets /app/dist ./dist
+COPY --from=runtime-assets /app/node_modules ./node_modules
+COPY --from=runtime-assets /app/package.json .
+COPY --from=runtime-assets /app/openclaw.mjs .
+COPY --from=runtime-assets /app/extensions ./extensions
+COPY --from=runtime-assets /app/skills ./skills
+COPY --from=runtime-assets /app/docs ./docs
 
 # In npm-installed Docker images, prefer the copied source extension tree for
 # bundled discovery so package metadata that points at source entries stays valid.
@@ -193,10 +191,9 @@ RUN --mount=type=cache,id=openclaw-bookworm-apt-cache,target=/var/cache/apt,shar
     if [ -n "$OPENCLAW_INSTALL_BROWSER" ]; then \
       apt-get update && \
       DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends xvfb && \
-      mkdir -p /home/node/.cache/ms-playwright && \
-      PLAYWRIGHT_BROWSERS_PATH=/home/node/.cache/ms-playwright \
-      node /app/node_modules/playwright-core/cli.js install --with-deps chromium && \
-      chown -R node:node /home/node/.cache/ms-playwright; \
+      mkdir -p /root/.cache/ms-playwright && \
+      PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright \
+      node /app/node_modules/playwright-core/cli.js install --with-deps chromium; \
     fi
 
 # Optionally install Docker CLI for sandbox container management.
@@ -236,11 +233,6 @@ RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw \
  && chmod 755 /app/openclaw.mjs
 
 ENV NODE_ENV=production
-
-# Security hardening: Run as non-root user
-# The node:24-bookworm image includes a 'node' user (uid 1000)
-# This reduces the attack surface by preventing container escape via root privileges
-USER node
 
 # Start gateway server with default config.
 # Binds to loopback (127.0.0.1) by default for security.
