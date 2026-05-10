@@ -50,6 +50,27 @@ FROM ${OPENCLAW_NODE_BOOKWORM_IMAGE} AS build
 ARG OPENCLAW_BUNDLED_PLUGIN_DIR
 ARG OPENCLAW_EXTENSIONS
 
+# Install corporate SSL certificate so all HTTPS requests (curl, pnpm, npm,
+# corepack) trust the corporate proxy/firewall during build.
+# Uncomment the following lines when building behind a corporate proxy/firewall:
+# COPY SAPL_2022.crt /usr/local/share/ca-certificates/SAPL_2022.crt
+# RUN update-ca-certificates
+# ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+#     SSL_CERT_DIR=/etc/ssl/certs \
+#     REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
+#     PIP_CERT=/etc/ssl/certs/ca-certificates.crt \
+#     NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt \
+#     NPM_CONFIG_CAFILE=/etc/ssl/certs/ca-certificates.crt
+
+# Verify SSL certificate works — fail early with a clear message if the
+# corporate cert is missing, expired, or not trusted by the proxy/firewall.
+# Uncomment when building behind a corporate proxy/firewall:
+# RUN echo "=== Verifying corporate SSL certificate ===" && \
+#     curl -fsSL -o /dev/null https://registry.npmjs.org/ && \
+#     echo "curl → npm registry: OK" && \
+#     node -e "fetch('https://registry.npmjs.org/').then(r => { console.log('node fetch → npm registry: OK (' + r.status + ')'); process.exit(0); }).catch(e => { console.error('node fetch → npm registry: FAILED -', e.message); process.exit(1); })" && \
+#     echo "=== SSL certificate verification passed ==="
+
 # Copy pinned Bun binary from the official image instead of fetching via curl.
 COPY --from=bun-binary /usr/local/bin/bun /usr/local/bin/bun
 
@@ -176,7 +197,37 @@ RUN --mount=type=cache,id=openclaw-bookworm-apt-cache,target=/var/cache/apt,shar
       ca-certificates curl git hostname lsof openssl procps python3 tini && \
     update-ca-certificates
 
+# Install GitHub CLI (gh) — pinned version, multi-arch support.
+ARG GH_CLI_VERSION=2.65.0
+RUN arch=$(dpkg --print-architecture) && \
+    curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_CLI_VERSION}/gh_${GH_CLI_VERSION}_linux_${arch}.tar.gz" | \
+    tar xz -C /tmp && \
+    mv "/tmp/gh_${GH_CLI_VERSION}_linux_${arch}/bin/gh" /usr/local/bin/gh && \
+    rm -rf "/tmp/gh_${GH_CLI_VERSION}_linux_${arch}" && \
+    gh --version
+
 RUN chown node:node /app
+
+# Install corporate SSL certificate in the runtime image so the running
+# gateway and any spawned processes (pip, curl, node fetch, etc.) trust
+# the corporate proxy/firewall.
+# Uncomment the following lines when deploying behind a corporate proxy/firewall:
+# COPY SAPL_2022.crt /usr/local/share/ca-certificates/SAPL_2022.crt
+# RUN update-ca-certificates
+# ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+#     SSL_CERT_DIR=/etc/ssl/certs \
+#     REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
+#     PIP_CERT=/etc/ssl/certs/ca-certificates.crt \
+#     NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt \
+#     NPM_CONFIG_CAFILE=/etc/ssl/certs/ca-certificates.crt
+
+# Verify SSL certificate works in the runtime image as well.
+# Uncomment when deploying behind a corporate proxy/firewall:
+# RUN echo "=== Verifying runtime SSL certificate ===" && \
+#     curl -fsSL -o /dev/null https://registry.npmjs.org/ && \
+#     echo "curl → npm registry: OK" && \
+#     node -e "fetch('https://registry.npmjs.org/').then(r => { console.log('node fetch → npm registry: OK (' + r.status + ')'); process.exit(0); }).catch(e => { console.error('node fetch → npm registry: FAILED -', e.message); process.exit(1); })" && \
+#     echo "=== Runtime SSL certificate verification passed ==="
 
 COPY --from=runtime-assets --chown=node:node /app/dist ./dist
 COPY --from=runtime-assets --chown=node:node /app/node_modules ./node_modules
@@ -189,6 +240,10 @@ COPY --from=runtime-assets --chown=node:node /app/${OPENCLAW_BUNDLED_PLUGIN_DIR}
 COPY --from=runtime-assets --chown=node:node /app/skills ./skills
 COPY --from=runtime-assets --chown=node:node /app/docs ./docs
 COPY --from=runtime-assets --chown=node:node /app/qa ./qa
+
+# In npm-installed Docker images, prefer the copied source extension tree for
+# bundled discovery so package metadata that points at source entries stays valid.
+ENV OPENCLAW_BUNDLED_PLUGINS_DIR=/app/extensions
 
 # Keep pnpm available in the runtime image for container-local workflows.
 # Use a shared Corepack home so the non-root `node` user does not need a
@@ -244,9 +299,9 @@ RUN --mount=type=cache,id=openclaw-bookworm-apt-cache,target=/var/cache/apt,shar
     if [ -n "$OPENCLAW_INSTALL_BROWSER" ]; then \
       apt-get update && \
       DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends xvfb && \
-      mkdir -p "$PLAYWRIGHT_BROWSERS_PATH" && \
-      node /app/node_modules/playwright-core/cli.js install --with-deps chromium && \
-      chown -R node:node "$PLAYWRIGHT_BROWSERS_PATH"; \
+      mkdir -p /root/.cache/ms-playwright && \
+      PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright \
+      node /app/node_modules/playwright-core/cli.js install --with-deps chromium; \
     fi
 
 # Optionally install Docker CLI for sandbox container management.
@@ -308,11 +363,6 @@ RUN install -d -m 0755 -o node -g node /home/node/.config && \
     stat -c '%U:%G %a' /home/node/.config/openclaw | grep -qx 'node:node 700'
 
 ENV NODE_ENV=production
-
-# Security hardening: Run as non-root user
-# The node:24-bookworm image includes a 'node' user (uid 1000)
-# This reduces the attack surface by preventing container escape via root privileges
-USER node
 
 # Start gateway server with default config.
 # Binds to loopback (127.0.0.1) by default for security.
